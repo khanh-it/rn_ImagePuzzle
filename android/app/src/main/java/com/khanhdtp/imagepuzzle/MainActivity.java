@@ -1,4 +1,4 @@
-package com.imagepuzzle;
+package com.khanhdtp.imagepuzzle;
 
 import com.facebook.react.ReactActivity;
 
