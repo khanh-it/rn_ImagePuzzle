@@ -59,11 +59,14 @@ encryptPassword.salt = '123-456-789';
  * https://stackoverflow.com/questions/6274339/how-can-i-shuffle-an-array
  * Shuffles array in place.
  * @param {Array} a items An array containing the items.
+ * @param {Object} b An object containing indexes mapping.
  */
-export function shuffle(a) {
+export function shuffle(a, b) {
     var j, x, i;
-    for (i = a.length - 1; i > 0; i--) {
+    b = (typeof b === "object") ? b : {};
+    for (i = a.length - 1; i >= 0; i--) {
         j = Math.floor(Math.random() * (i + 1));
+        b[i] = j;
         x = a[i];
         a[i] = a[j];
         a[j] = x;

@@ -9,8 +9,8 @@ const theme = ESS.value('$theme');
 // +++ theme default: 'light'
 const dfStyles = {
     root: {
-        $outline: 1,
-        borderColor: 'red',
+        borderWidth: 1,
+        borderColor: 'silver',
         position: 'relative',
         overflow: 'hidden'
     },

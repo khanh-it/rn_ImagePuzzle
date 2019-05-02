@@ -9,9 +9,9 @@ import {
   TouchableOpacity,
   Image
 } from 'react-native';
+import * as Ani from 'react-native-animatable';
 import {
-  Text,
-  VectorIcon
+  Text
 } from 'react-native-my';
 
 // Css
@@ -25,10 +25,9 @@ import styles from './styles';
 export default class PhotoFragmentComponent extends PureComponent
 {
   /**
-   * Ref
    * @var {Object}
    */
-  refScrollView = null;
+  _refAniView = null;
 
   constructor(props)
   {
@@ -38,11 +37,46 @@ export default class PhotoFragmentComponent extends PureComponent
     this.state = {};
 
     // Bind method(s)
-
+    this._handlePress = this._handlePress.bind(this);
   }
 
   componentDidMount()
   {
+  }
+
+  /**
+   * 
+   * @param {Object} param
+   * @param {Object} event 
+   * @return void
+   */
+  _handlePress({ row, col }, event)
+  {
+    // console.log(`fragment-r${row}-c${col} is touched!`);
+    let {
+      onPress
+    } = this.props;
+    //
+    if (onPress) {
+      onPress({ row, col });
+    }
+  }
+
+  /**
+   * Calculate <Image /> style
+   */
+  _calImgStyle(opts = {})
+  {
+    let {
+      imgStyle,
+      row, col,
+      fragmentStyle
+    } = this.props;
+
+    return Object.assign({}, imgStyle, {
+      top: -1 * (fragmentStyle.height * (opts.row || row)),
+      left: -1 * (fragmentStyle.width * (opts.col || col))
+    });
   }
 
   render()
@@ -52,33 +86,31 @@ export default class PhotoFragmentComponent extends PureComponent
       imgStyle,
       rows, row,
       cols, col,
-      fragmentStyle
+      fragmentStyle,
+      visible
     } = this.props;
     if (!imgStyle) {
       return null;
     }
     // +++
-    let _imgStyle = Object.assign({}, imgStyle, {
-      top: -1 * (fragmentStyle.height * row),
-      left: -1 * (fragmentStyle.width * col)
-    });
+    let _imgStyle = this._calImgStyle();
     //
     // console.log(`fragment-r${row}-c${col}# fragmentStyle: ${JSON.stringify(fragmentStyle)} '-- imgStyle: ${JSON.stringify(imgStyle)}`);
     //
     return (
       <TouchableOpacity
-        activeOpacity={0.8}
-        onPress={() => {
-          alert(`fragment-r${row}-c${col} is touched!`);
+        activeOpacity={0.9}
+        onPress={(event) => {
+          this._handlePress({ row, col }, event);
         }}
       >
-        <View
+        <Ani.View
           ref={ref => {
-            this.refScrollView = ref;
+            this._refAniView = ref;
             global._refFragments = global._refFragments || {};
             global._refFragments[`${row}.${col}`] = ref;
           }}
-          style={[styles.root, fragmentStyle]}
+          style={[(false === visible) && { opacity: 0 }, styles.root, fragmentStyle]}
           // contentContainerStyle={[styles.rootCCS, imgStyle]}
           // scrollEnabled={true}
           // horizontal={true}
@@ -95,7 +127,7 @@ export default class PhotoFragmentComponent extends PureComponent
             style={[styles.img, _imgStyle]}
             source={imgSrc}
           />
-        </View>
+        </Ani.View>
       </TouchableOpacity>
     );
   }

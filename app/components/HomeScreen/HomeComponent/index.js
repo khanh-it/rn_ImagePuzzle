@@ -36,7 +36,7 @@ export default class HomeComponent extends PureComponent
   /**
    * @var {Array}
    */
-  refFragments = [];
+  _refFragments = [];
 
   constructor(props)
   {
@@ -44,15 +44,17 @@ export default class HomeComponent extends PureComponent
 
     // Initial state
     this.state = {
-      photos: [],
       selectedPhoto: null,
-      fragments: [],
+      map: [],
+      mapShuffle: [],
       fragmentRows: 4, // 5~10
       fragmentCols: 4, // 5~10,
       /** @var {Object}  */
       imgStyle: null,
       /** @var {Object}  */
-      fragmentStyle: null
+      fragmentStyle: null,
+      /** @var {Number}  */
+      moveCnt: 0 // move(s) count
     };
 
     // Bind method(s)
@@ -60,6 +62,8 @@ export default class HomeComponent extends PureComponent
     this._cameraRollRequestPermissions = this._cameraRollRequestPermissions.bind(this);
     this._cameraRollGetPhotos = this._cameraRollGetPhotos.bind(this);
     this._handleLayout = this._handleLayout.bind(this);
+    this._handlePhotoFragmentPress = this._handlePhotoFragmentPress.bind(this);
+    this._setPhotoFragment = this._setPhotoFragment.bind(this);
 
     // Navigation event(s)
   }
@@ -88,7 +92,23 @@ export default class HomeComponent extends PureComponent
 
     let selectedPhoto = require('../../../assets/img/puzzle/001.jpg');
     //
-    this.setState({ selectedPhoto });
+    // let {} = this.state;
+
+    //
+    let map = [];
+    let mapShuffle = [];
+    this._map((row, col) => map.push({
+      row, col, visible: !(0 === row && 0 === col) // @TODO
+    }));
+    mapShuffle = map.concat([]); // copy array
+    helpers.shuffle(mapShuffle);
+    // console.log('mapShuffle : ', mapShuffle);
+    //
+    this.setState({
+      selectedPhoto,
+      map,
+      mapShuffle
+    });
   }
 
   _handleGetPhotos()
@@ -160,11 +180,124 @@ export default class HomeComponent extends PureComponent
     }
   }
 
+  /**
+   * 
+   */
+  _isPtFragVisible({ row, col })
+  {
+    let result = false;
+    let ptFragment = this._findPhotoFragment({ row, col });
+    if (ptFragment) {
+      result = ptFragment.visible;
+    } else {
+      result = (0 === row && 0 === col);
+    }
+    return result;
+  }
+
+  /**
+   * Helper, set photo fragment ref
+   * @param {Object}
+   * @return void
+   */
+  _setPhotoFragment({ row, col, ref, visible = true })
+  {
+    this._refFragments.push({ row, col, ref, visible });
+    global._refPhotoFragments = global._refPhotoFragments || {};
+    global._refPhotoFragments[`${row}.${col}`] = ref;
+  }
+
+  /**
+   * Helper, find photo fragment by row, col
+   * @param {Object} { row, col, visible }
+   * @return {Object}|null
+   */
+  _findPhotoFragment({ row, col, visible })
+  {
+    let foundRef = null;
+    let foundIdx = 0;
+    if (row >= 0 && col >= 0) {
+      foundRef = this._refFragments.find((item, index) => {
+        let result = (item.row === row && item.col === col);
+        if (result && (typeof visible === "boolean")) {
+          let { ref: { props } } = item;
+          result = (visible === props.visible);
+        }
+        if (result) {
+          foundIdx = index;
+        }
+        return result;
+      });
+    }
+    if (foundRef) {
+      foundRef = Object.assign({ index: foundIdx }, foundRef);
+    }
+    // console.log('foundRef: ', foundRef);
+    return foundRef;
+  }
+
+  _handlePhotoFragmentPress({ row, col })
+  {
+    let foundItem = this._findPhotoFragment({ row, col, visible: true });
+    if (foundItem) {
+      // Can move?
+      let posibleItem = null;
+      let posibleMoves = {
+        'top': { row: row - 1, col: col },
+        'right': { row: row, col: col + 1 },
+        'bottom': { row: row + 1, col: col },
+        'left': { row: row, col: col - 1 },
+      };
+      // console.log('posibleMoves: ', posibleMoves);
+      for (let position in posibleMoves) {
+        let moveItem = posibleMoves[position];
+        posibleItem = this._findPhotoFragment(Object.assign({ visible: false }, moveItem));
+        if (posibleItem) {
+          // console.log('posibleItem: ', position, posibleItem);
+          // @TODO: switch PhotoFragments
+          this.setState(({ mapShuffle, moveCnt }) => {
+            let item = mapShuffle[foundItem.index];
+            mapShuffle[foundItem.index] = mapShuffle[posibleItem.index];
+            mapShuffle[posibleItem.index] = item;
+            mapShuffle = mapShuffle.concat([]);
+            return {
+              mapShuffle,
+              moveCnt: moveCnt + 1
+            };
+          });
+          // this._switchPhotoFragments(foundItem, posibleItem);
+          break;
+        }
+      }
+    }
+  }
+
+  /**
+   * Method: move photo fragment
+   */
+  _switchPhotoFragments(foundItem, posibleItem)
+  {
+    let imgStyle = this._calImgStyle({
+      row, col
+    });
+    console.log('moved#imgStyle: ', imgStyle);
+    // this._refAniView.setNativeProps(imgStyle);
+  }
+
   _renderHeader()
   {
+    let {
+      moveCnt
+    } = this.state;
+
     return (
       <View style={[styles.header]}>
-        <Text>Header</Text>
+        <View style={[styles.headerL]}>
+          <Text>Header</Text>
+        </View>
+        <View style={[styles.headerR]}>
+          <Text>Moves: {moveCnt}</Text>
+        </View>
       </View>
     );
   }
@@ -173,6 +306,8 @@ export default class HomeComponent extends PureComponent
   {
     let {
       selectedPhoto,
+      map,
+      mapShuffle,
       // fragments,
       fragmentRows,
       fragmentCols,
@@ -183,43 +318,46 @@ export default class HomeComponent extends PureComponent
     //
     let willRender = (selectedPhoto && imgStyle && fragmentStyle);
     //
-    this.refFragments.splice(0);
-
-    //
-    let fragments = [];
-    if (willRender) {
-      this._map((row, col) => {
-        fragments.push({ row, col });
-      });
-      fragments = helpers.shuffle(fragments);
-    }
-    console.log('fragments: ', fragments);
+    this._refFragments = [];
 
     return (
-      <View
+      <ImageBackground
+        source={require('../../../assets/img/empty_bg_xs.jpg')}
         style={[styles.body]}
         onLayout={(event) => {
           this._handleLayout(event, 'body');
         }}
+        imageStyle={[styles.bodyBg]}
+        resizeMode={'repeat'}
+        resizeMethod="resize"
       >
-        {fragments.map(({ row, col }) => {
-          return (
-            <PhotoFragmentComponent
-              ref={ref => {
-                this.refFragments.push(ref);
-              }}
-              key={`fragment-r${row}-c${col}`}
-              imgSrc={selectedPhoto}
-              imgStyle={imgStyle}
-              rows={fragmentRows}
-              cols={fragmentCols}
-              row={row}
-              col={col}
-              fragmentStyle={fragmentStyle}
-            />
-          );
-        })}
-      </View>
+      {map.map(({ row, col, visible }, index) => {
+        let item = mapShuffle[index];
+        // console.log(`row/col: ${row}/${col} --> ${item.row}/${item.col}`);
+        return (
+          <PhotoFragmentComponent
+            ref={(ref) => {
+              // console.log(`ptFragRef: `, ref);
+              if (ref) {
+                this._setPhotoFragment(Object.assign({ ref }, { row, col }));
+              }
+            }}
+            key={`fragment-r${row}-c${col}`}
+            imgSrc={selectedPhoto}
+            imgStyle={imgStyle}
+            rows={fragmentRows}
+            cols={fragmentCols}
+            row={item.row}
+            col={item.col}
+            fragmentStyle={fragmentStyle}
+            visible={item.visible}
+            onPress={(event) => {
+              this._handlePhotoFragmentPress({ row, col });
+            }}
+          />
+        );
+      })}
+      </ImageBackground>
     );
   }
 
@@ -256,3 +394,5 @@ export default class HomeComponent extends PureComponent
     );
   }
 }
+// Make alias
+const _static = HomeComponent;
