@@ -8,27 +8,30 @@ import ESS from 'react-native-extended-stylesheet';
 const theme = ESS.value('$theme');
 // +++ theme default: 'light'
 const dfStyles = {
-    root: Object.assign({
-        // flex: 1
-        paddingTop: '1%',
-        paddingRight: '2%',
-        paddingBottom: '1%',
-        paddingLeft: '2%',
-        $outline: 1
-    }, ESS.value('$body')),
-    box: {
-        $outline: 1,
-        flex: 1
-    },
-    body: {
-        $outline: 1,
-        width: '100%',
-        height: '100%',
-        flex: 1,
+    header: {
+        // $outline: 1,
         flexDirection: 'row',
-        flexWrap: 'wrap'
+        height: '10%'
     },
-    bodyBg: {},
+    headerL: {
+        width: '50%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerTxt001: {
+        fontSize: '1.5rem'
+    },
+    headerTxt002: {
+        fontSize: '0.8rem'
+    },
+    headerR: {
+        width: '50%',
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    headerTxt101: {
+        fontSize: '3rem'
+    },
 };
 const css = {
     // theme 'light'

@@ -8,10 +8,7 @@ import {
   View,
   // ScrollView,
   ImageBackground,
-  TouchableOpacity,
-  PermissionsAndroid,
-  CameraRoll,
-  // Image,
+  StyleSheet,
   TextInput
 } from 'react-native';
 import {
@@ -23,7 +20,10 @@ import { RNCamera } from 'react-native-camera';
 import styles from '../styles';
 
 // Component(s)
+import HeaderComponent from '../HeaderComponent';
+import FooterComponent from '../FooterComponent';
 import PhotoFragmentComponent from '../PhotoFragmentComponent';
+import GetReadyComponent from './GetReadyComponent';
 
 // helpers
 import * as helpers from '../../../helpers';
@@ -34,9 +34,14 @@ import * as helpers from '../../../helpers';
 export default class HomeComponent extends PureComponent
 {
   /**
-   * @var {Array}
+   * @param {Object}
    */
-  _refFragments = [];
+  _refHeaderComp = null;
+
+  /**
+   * @param {Object}
+   */
+  _refFooterComp = null;
 
   constructor(props)
   {
@@ -47,30 +52,31 @@ export default class HomeComponent extends PureComponent
       selectedPhoto: null,
       map: [],
       mapShuffle: [],
-      fragmentRows: 4, // 5~10
-      fragmentCols: 4, // 5~10,
+      fragmentRows: 3, // 5~10
+      fragmentCols: 3, // 5~10,
       /** @var {Object}  */
       imgStyle: null,
       /** @var {Object}  */
       fragmentStyle: null,
       /** @var {Number}  */
-      moveCnt: 0 // move(s) count
+      moveCnt: 0, // move(s) count,
+      /** @var {Boolean}  */
+      readyFlag: null
     };
 
     // Bind method(s)
-    this._handleGetPhotos = this._handleGetPhotos.bind(this);
-    this._cameraRollRequestPermissions = this._cameraRollRequestPermissions.bind(this);
-    this._cameraRollGetPhotos = this._cameraRollGetPhotos.bind(this);
     this._handleLayout = this._handleLayout.bind(this);
-    this._handlePhotoFragmentPress = this._handlePhotoFragmentPress.bind(this);
+    this._handlePtFragPress = this._handlePtFragPress.bind(this);
+    this._handlePtFragLoadEnd = this._handlePtFragLoadEnd.bind(this);
     this._setPhotoFragment = this._setPhotoFragment.bind(this);
+    this._handleReady = this._handleReady.bind(this);
 
     // Navigation event(s)
   }
 
   componentDidMount()
   {
-    this._handleSelectedPhoto();
+    this._handleSelectPhoto();
   }
 
   _map(cb)
@@ -87,77 +93,70 @@ export default class HomeComponent extends PureComponent
     });
   }
 
-  _handleSelectedPhoto(_selectedPhoto)
+  /**
+   * Helper check if game is finished?
+   * @return {Boolean}
+   */
+  _isGameFinished()
   {
+    let result = false;
+    let { map, mapShuffle } = this.state;
+    if (map.length && (map.length === mapShuffle.length)) {
+      result = true;
+      for (let index in map) {
+        let item = map[index];
+        let _item = mapShuffle[index];
+        if (!(item.row === _item.row && item.col === _item.col)) {
+          result = false;
+          break;
+        }
+      }
+    }
+    return result;
+  }
 
-    let selectedPhoto = require('../../../assets/img/puzzle/001.jpg');
+  /**
+   * @TODO: 
+   * @param {*} _selectedPhoto 
+   */
+  _handleSelectPhoto(_selectedPhoto)
+  {
     //
-    // let {} = this.state;
-
-    //
+    let selectedPhoto = require('../../../assets/img/puzzle/001.jpg'); // _selectedPhoto
+    // Create map data of fragments from photo
     let map = [];
     let mapShuffle = [];
     this._map((row, col) => map.push({
-      row, col, visible: !(0 === row && 0 === col) // @TODO
+      row, col,
+      ref: null, // PhotoFragment's ref
+      visible: true
     }));
-    mapShuffle = map.concat([]); // copy array
-    helpers.shuffle(mapShuffle);
-    // console.log('mapShuffle : ', mapShuffle);
     //
-    this.setState({
-      selectedPhoto,
-      map,
-      mapShuffle
-    });
+    this.setState({ selectedPhoto, map, mapShuffle });
   }
 
-  _handleGetPhotos()
+  /**
+   * Handle get ready is done!
+   * @returns void
+   */
+  _handleReady()
   {
-    this._cameraRollRequestPermissions()
-      .then(this._cameraRollGetPhotos)
-      .then((result) => {
-        console.log('_cameraRollGetPhotos: ', result);
-        this.setState({ photos: result.edges });
-      });
-  }
-
-  async _cameraRollRequestPermissions()
-  {
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-        {
-          title: 'Cool Photo App Camera Permission',
-          message: 'Cool Photo App needs access to your camera so you can take awesome pictures.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
-        },
-      );
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        return granted;
-      } else {
-        throw new Error('permission denied');
-      }
-    } catch (err) {
-      console.warn(err);
-    }
-  }
-
-  async _cameraRollGetPhotos()
-  {
-    let result = await CameraRoll.getPhotos({
-      first: 25,
-      assetType: 'Photos'
-    });
-    return result;
+    let { map, mapShuffle } = this.state;
+    // Shuffle map data of fragments from photo
+    mapShuffle = map.concat([]); // copy array
+    // @TODO: helpers.shuffle(mapShuffle);
+    let a = mapShuffle[0]; mapShuffle[0] = mapShuffle[1]; mapShuffle[1] = a;
+    // @TODO: detect photo fragment is visible rule?
+    mapShuffle[0].visible = false;
+    //
+    this.setState({ readyFlag: true, mapShuffle });
   }
 
   _layouts = {}
 
   _handleLayout(event, type)
   {
-    console.log('_handleLayout: ', type, event.nativeEvent);
+    // console.log('_handleLayout: ', type, event.nativeEvent);
     let layout = event.nativeEvent.layout;
     this._layouts[type] = layout;
     //
@@ -200,11 +199,21 @@ export default class HomeComponent extends PureComponent
    * @param {Object}
    * @return void
    */
-  _setPhotoFragment({ row, col, ref, visible = true })
+  _setPhotoFragment({ row, col, ref, visible })
   {
-    this._refFragments.push({ row, col, ref, visible });
+    let { map } = this.state;
+    map.forEach((item) => {
+      if (item.row === row && item.col === col) {
+        Object.assign(item, { ref });
+        if (typeof visible === "boolean") {
+          Object.assign(item, { visible });
+        }
+      }
+    });
+    // Debug only
     global._refPhotoFragments = global._refPhotoFragments || {};
     global._refPhotoFragments[`${row}.${col}`] = ref;
+    //.end
   }
 
   /**
@@ -217,7 +226,7 @@ export default class HomeComponent extends PureComponent
     let foundRef = null;
     let foundIdx = 0;
     if (row >= 0 && col >= 0) {
-      foundRef = this._refFragments.find((item, index) => {
+      foundRef = this.state.map.find((item, index) => {
         let result = (item.row === row && item.col === col);
         if (result && (typeof visible === "boolean")) {
           let { ref: { props } } = item;
@@ -236,7 +245,7 @@ export default class HomeComponent extends PureComponent
     return foundRef;
   }
 
-  _handlePhotoFragmentPress({ row, col })
+  _handlePtFragPress({ row, col })
   {
     let foundItem = this._findPhotoFragment({ row, col, visible: true });
     if (foundItem) {
@@ -260,12 +269,16 @@ export default class HomeComponent extends PureComponent
             mapShuffle[foundItem.index] = mapShuffle[posibleItem.index];
             mapShuffle[posibleItem.index] = item;
             mapShuffle = mapShuffle.concat([]);
-            return {
-              mapShuffle,
-              moveCnt: moveCnt + 1
-            };
+            // Check if game is finished?
+            setTimeout(() => {
+              if (this._isGameFinished()) {
+                alert(`Congratulations, your score(s): ${this.state.moveCnt}.`);
+              }
+            });
+            return { mapShuffle/*, moveCnt: moveCnt + 1*/ };
           });
-          // this._switchPhotoFragments(foundItem, posibleItem);
+          //
+          this._refHeaderComp.setMoveCnt(++this.state.moveCnt);
           break;
         }
       }
@@ -273,32 +286,31 @@ export default class HomeComponent extends PureComponent
   }
 
   /**
-   * Method: move photo fragment
+   * Event handler (when photo fragment is loaded)
+   * 
    */
-  _switchPhotoFragments(foundItem, posibleItem)
+  _handlePtFragLoadEnd({ row, col })
   {
-    let imgStyle = this._calImgStyle({
-      row, col
-    });
-    console.log('moved#imgStyle: ', imgStyle);
-    // this._refAniView.setNativeProps(imgStyle);
+    let { fragmentRows, fragmentCols } = this.state;
+
+    if (row === (fragmentRows - 1) && (col === (fragmentCols - 1))) {
+      // alert('imgLoadEnd eventually...');
+      setTimeout(() => {
+        this.setState({ readyFlag: false });
+      });
+    }
   }
 
   _renderHeader()
   {
-    let {
-      moveCnt
-    } = this.state;
+    let { moveCnt } = this.state;
 
     return (
-      <View style={[styles.header]}>
-        <View style={[styles.headerL]}>
-          <Text>Header</Text>
-        </View>
-        <View style={[styles.headerR]}>
-          <Text>Moves: {moveCnt}</Text>
-        </View>
-      </View>
+      <HeaderComponent
+        // key={`hdr-mcnt${moveCnt}`}
+        ref={ref => { this._refHeaderComp = ref; }}
+        moveCnt={moveCnt}
+      />
     );
   }
 
@@ -306,20 +318,18 @@ export default class HomeComponent extends PureComponent
   {
     let {
       selectedPhoto,
-      map,
-      mapShuffle,
-      // fragments,
-      fragmentRows,
-      fragmentCols,
-      imgStyle,
-      fragmentStyle
+      map, mapShuffle,
+      fragmentRows, fragmentCols,
+      imgStyle, fragmentStyle,
+      readyFlag
     } = this.state;
 
     //
     let willRender = (selectedPhoto && imgStyle && fragmentStyle);
     //
-    this._refFragments = [];
+    let willRenderGetReady = !!map.length && !mapShuffle.length && (false === readyFlag);
 
+    //
     return (
       <ImageBackground
         source={require('../../../assets/img/empty_bg_xs.jpg')}
@@ -332,7 +342,7 @@ export default class HomeComponent extends PureComponent
         resizeMethod="resize"
       >
       {map.map(({ row, col, visible }, index) => {
-        let item = mapShuffle[index];
+        let item = mapShuffle[index] || map[index];
         // console.log(`row/col: ${row}/${col} --> ${item.row}/${item.col}`);
         return (
           <PhotoFragmentComponent
@@ -352,11 +362,17 @@ export default class HomeComponent extends PureComponent
             fragmentStyle={fragmentStyle}
             visible={item.visible}
             onPress={(event) => {
-              this._handlePhotoFragmentPress({ row, col });
+              this._handlePtFragPress({ row, col });
+            }}
+            onImgLoadEnd={() => {
+              return this._handlePtFragLoadEnd({ row, col });
             }}
           />
         );
       })}
+      {willRenderGetReady && (<GetReadyComponent
+        onReady={this._handleReady}
+      />)}
       </ImageBackground>
     );
   }
@@ -364,15 +380,9 @@ export default class HomeComponent extends PureComponent
   _renderFooter()
   {
     return (
-      <View style={[styles.footer]}>
-        <TouchableOpacity
-          activeOpacity={0.8}
-          onPress={this._handleGetPhotos}
-        >
-          {/* <TextInput style={{ borderWidth: 1, borderColor: 'grey' }} /> */}
-          <VectorIcon nameAndroid="md-photos" nameIos="ios-photos" size={32} />
-        </TouchableOpacity>
-      </View>
+      <FooterComponent
+        ref={ref => { this._refFooterComp = ref; }}
+      />
     );
   }
 

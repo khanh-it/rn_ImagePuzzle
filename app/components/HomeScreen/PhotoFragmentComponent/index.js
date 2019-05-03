@@ -126,6 +126,7 @@ export default class PhotoFragmentComponent extends PureComponent
             }}
             style={[styles.img, _imgStyle]}
             source={imgSrc}
+            onLoadEnd={this.props.onImgLoadEnd}
           />
         </Ani.View>
       </TouchableOpacity>
