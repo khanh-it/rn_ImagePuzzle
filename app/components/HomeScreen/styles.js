@@ -17,11 +17,12 @@ const dfStyles = {
         $outline: 1
     }, ESS.value('$body')),
     box: {
-        $outline: 1,
+        // $outline: 1,
         flex: 1
     },
     body: {
-        $outline: 1,
+        // $outline: 1,
+        borderColor: 'black',
         width: '100%',
         height: '100%',
         flex: 1,

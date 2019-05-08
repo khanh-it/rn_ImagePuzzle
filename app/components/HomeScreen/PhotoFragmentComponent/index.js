@@ -2,14 +2,15 @@
  * 
  */
 import React, { PureComponent } from "react";
-import ESS from 'react-native-extended-stylesheet';
+// import ESS from 'react-native-extended-stylesheet';
+// import * as Ani from 'react-native-animatable';
 //
 import {
   View,
   TouchableOpacity,
   Image
 } from 'react-native';
-import * as Ani from 'react-native-animatable';
+
 import {
   Text
 } from 'react-native-my';
@@ -104,7 +105,7 @@ export default class PhotoFragmentComponent extends PureComponent
           this._handlePress({ row, col }, event);
         }}
       >
-        <Ani.View
+        <View
           ref={ref => {
             this._refAniView = ref;
             global._refFragments = global._refFragments || {};
@@ -128,7 +129,7 @@ export default class PhotoFragmentComponent extends PureComponent
             source={imgSrc}
             onLoadEnd={this.props.onImgLoadEnd}
           />
-        </Ani.View>
+        </View>
       </TouchableOpacity>
     );
   }

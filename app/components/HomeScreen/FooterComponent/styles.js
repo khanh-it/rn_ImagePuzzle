@@ -10,7 +10,13 @@ const theme = ESS.value('$theme');
 const dfStyles = {
     footer: {
         padding: '1%',
-        $outline: 1,
+        flexDirection: 'row'
+    },
+    footerL: {
+        width: '50%'
+    },
+    footerR: {
+        width: '50%',
         alignItems: 'flex-end'
     }
 };

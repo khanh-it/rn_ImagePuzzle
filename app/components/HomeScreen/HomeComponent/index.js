@@ -3,13 +3,15 @@
  */
 import React, { PureComponent } from "react";
 import ESS from 'react-native-extended-stylesheet';
+import Sound from "react-native-sound";
 //
 import {
   View,
   // ScrollView,
   ImageBackground,
   StyleSheet,
-  TextInput
+  TextInput,
+  Alert
 } from 'react-native';
 import {
   Text,
@@ -25,8 +27,8 @@ import FooterComponent from '../FooterComponent';
 import PhotoFragmentComponent from '../PhotoFragmentComponent';
 import GetReadyComponent from './GetReadyComponent';
 
-// helpers
-import * as helpers from '../../../helpers';
+// Enable playback in silence mode
+Sound.setCategory('Playback');
 
 /**
  * @class HomeComponent
@@ -52,12 +54,16 @@ export default class HomeComponent extends PureComponent
       selectedPhoto: null,
       map: [],
       mapShuffle: [],
-      fragmentRows: 3, // 5~10
-      fragmentCols: 3, // 5~10,
+      fragmentRows: 3, // 3~10
+      fragmentCols: 3, // 3~10,
       /** @var {Object}  */
       imgStyle: null,
       /** @var {Object}  */
       fragmentStyle: null,
+      /** @var {Number}  */
+      gameCnt: 0, // count number of times game played,
+      /** @var {Object}  */
+      gameStat: {}, // game's current status!
       /** @var {Number}  */
       moveCnt: 0, // move(s) count,
       /** @var {Boolean}  */
@@ -70,13 +76,154 @@ export default class HomeComponent extends PureComponent
     this._handlePtFragLoadEnd = this._handlePtFragLoadEnd.bind(this);
     this._setPhotoFragment = this._setPhotoFragment.bind(this);
     this._handleReady = this._handleReady.bind(this);
+    // +++
+    this._playSound = this._playSound.bind(this);
+    this._playSoundSystemBg = this._playSoundSystemBg.bind(this);
+    this._playSoundPtFragPress = this._playSoundPtFragPress.bind(this);
 
     // Navigation event(s)
   }
 
   componentDidMount()
   {
-    this._handleSelectPhoto();
+    // Init sound(s)
+    this._playSoundSystemBg({
+      onBfPlay: (sound) => {
+        sound.setNumberOfLoops(-1);
+      }
+    });
+    this._playSoundPtFragPress({ onBfPlay: () => false });
+    //.end
+
+    //
+    this._startGame();
+  }
+
+  componentDidUpdate()
+  {
+    let {
+      gameStat,
+      moveCnt
+    } = this.state;
+
+    // Case: game is getting finish
+    if ('finishing' === gameStat.stat) {
+
+    }
+
+    // Case: game is finished
+    if ('finished' === gameStat.stat) {
+      Alert.alert(
+        'Congratulations',
+        `Your score(s): ${moveCnt}.`,
+        [
+          // {text: 'Ask me later', onPress: () => console.log('Ask me later pressed')},
+          {
+            text: 'Replay',
+            onPress: () => {
+              this._startGame();
+            },
+            // style: 'cancel',
+          },
+          {
+            text: 'New Game',
+            onPress: () => {
+              mapShuffle = map.concat([]);
+              this.setState({ mapShuffle });
+            }
+          },
+        ],
+        { cancelable: false },
+      );
+    }
+  }
+
+  /**
+   * @var {Object} Sound instances
+   */
+  static _sounds = {};
+
+  /**
+   * Helper: play sound
+   * @param {String} type
+   * @param {Object} opts
+   * @return {Object}
+   */
+  _playSound(type, { isRequire, url, pause, onBfPlay })
+  {
+    //
+    //
+    //
+    function getSound(callback)
+    {
+      let sound = _static._sounds[type];
+      if (sound) {
+        callback(null, sound);
+      } else {
+        sound = new Sound(url, (error) => {
+          if (error) {
+            _static._sounds[type] = null;
+            Alert.alert("error", error.message);
+          }
+          callback(error, sound);
+        });
+      }
+      return sound;
+    }
+    let sound = getSound((error, sound) => {
+      if (!error && sound) { 
+        // Run optional pre-play callback
+        let callBfPlayRs = null;
+        if (onBfPlay) {
+          callBfPlayRs = onBfPlay(sound);
+        }
+        if (false !== callBfPlayRs) {
+          if (pause) {
+            sound.setNumberOfLoops(0);
+            sound.stop(() => sound.release());
+            _static._sounds[type] = null;
+            return;
+            return sound.pause(() => {
+              console.log(`Pause sound ${type}!`);
+            });
+          }
+          sound.stop(() => sound.play(() => {
+            console.log(`Play sound ${type}!`);
+            // Release when it's done so we're not using up resources
+            // sound.release();
+          }));
+        }
+      }
+    });
+    return sound;
+  }
+
+  /**
+   * Play sound system background
+   * @param {Object}
+   * @return {Object}
+   */
+  _playSoundSystemBg(opts = {})
+  {
+    let sound = this._playSound('SYS_BG', Object.assign(opts, {
+      isRequire: true,
+      url: require("../../../assets/audio/whoosh.mp3")
+    }));
+    return sound;
+  }
+
+  /**
+   * Play sound when <PhotoFragment /> is pressed
+   * @param {Object}
+   * @return {Object}
+   */
+  _playSoundPtFragPress(opts = {})
+  {
+    let sound = this._playSound('PT_FRAGMENT', Object.assign(opts, {
+      isRequire: true,
+      url: require("../../../assets/audio/whoosh.mp3")
+    }));
+    return sound;
   }
 
   _map(cb)
@@ -100,18 +247,35 @@ export default class HomeComponent extends PureComponent
   _isGameFinished()
   {
     let result = false;
+    let mapInvisible = [];
     let { map, mapShuffle } = this.state;
     if (map.length && (map.length === mapShuffle.length)) {
       result = true;
       for (let index in map) {
         let item = map[index];
         let _item = mapShuffle[index];
-        if (!(item.row === _item.row && item.col === _item.col)) {
+        if (result && !(item.row === _item.row && item.col === _item.col)) {
           result = false;
-          break;
+        }
+        if (!item.visible) {
+          mapInvisible.push(item);
+        }
+        if (!_item.visible) {
+          mapInvisible.push(_item);
         }
       }
     }
+    // Case: the game is finished
+    if (result) {
+      // Reset <PhotoFragment /> item's state
+      mapInvisible.forEach(item => {
+        item.visible = true;
+      });
+      mapShuffle = [];
+      this.setState({ mapShuffle, gameStat: { 'stat': 'finished' } });
+    }
+
+    // Return
     return result;
   }
 
@@ -119,20 +283,29 @@ export default class HomeComponent extends PureComponent
    * @TODO: 
    * @param {*} _selectedPhoto 
    */
-  _handleSelectPhoto(_selectedPhoto)
+  _startGame(_selectedPhoto)
   {
     //
-    let selectedPhoto = require('../../../assets/img/puzzle/001.jpg'); // _selectedPhoto
+    let selectedPhoto = _selectedPhoto || require('../../../assets/img/puzzle/001.jpg'); // _selectedPhoto
     // Create map data of fragments from photo
     let map = [];
-    let mapShuffle = [];
     this._map((row, col) => map.push({
       row, col,
       ref: null, // PhotoFragment's ref
       visible: true
     }));
     //
-    this.setState({ selectedPhoto, map, mapShuffle });
+    this.setState(({ gameCnt }) => {
+      return {
+        selectedPhoto,
+        map,
+        mapShuffle: [],
+        gameCnt: gameCnt + 1,
+        gameStat: {},
+        moveCnt: 0,
+        readyFlag: false
+      }
+    });
   }
 
   /**
@@ -154,29 +327,51 @@ export default class HomeComponent extends PureComponent
 
   _layouts = {}
 
+  /**
+   * Handler: component's layout changes
+   * @param {Object} event 
+   * @param {String} type 
+   */
   _handleLayout(event, type)
   {
     // console.log('_handleLayout: ', type, event.nativeEvent);
     let layout = event.nativeEvent.layout;
-    this._layouts[type] = layout;
-    //
-    if ('body' === type) {
-      let {
-        fragmentRows,
-        fragmentCols
-      } = this.state;
-      // +++
-      let imgStyle = { width: layout.width, height: layout.height };
-      // +++
+
+    // Case: "boby" component!
+    if ('body' === type && !this._layouts[type]) {
+      let { fragmentRows, fragmentCols } = this.state;
+      let { width, height } = layout;
+      // +++ Set style for <Image /> in PhotoFragment!
+      let imgStyle = { width, height };
+      // @TODO: ???
+      width -= 1; height -= 0;
+      // +++ Calculate style for the PhotoFragment itself
       let fragmentStyle = {
-        width: Math.floor(layout.width / fragmentCols) - 1,
-        height: Math.floor(layout.height / fragmentRows)
+        width: Math.floor(width / fragmentCols),
+        height: Math.floor(height / fragmentRows)
       };
-      //
-      this.setState({
-        imgStyle, fragmentStyle
-      });
+      // +++ calculate style for body component
+      let paddings = {
+        width: width - (fragmentStyle.width * fragmentCols),
+        height: height - (fragmentStyle.height * fragmentRows),
+      };
+      let top = Math.ceil(paddings.height / 2);
+      let bottom = paddings.height - top;
+      let left = Math.ceil(paddings.width / 2);
+      let right = paddings.width - left;
+      let bodyStyle = {
+        borderTopWidth: top,
+        borderRightWidth: right,
+        borderBottomWidth: bottom,
+        borderLeftWidth: left,
+      };
+      // console.log({ imgStyle, fragmentStyle, paddings, bodyStyle });
+      this._refBody.setNativeProps(bodyStyle);
+      // 
+      this.setState({ imgStyle, fragmentStyle });
     }
+    // Store layout date for later uses
+    this._layouts[type] = layout;
   }
 
   /**
@@ -245,6 +440,10 @@ export default class HomeComponent extends PureComponent
     return foundRef;
   }
 
+  /**
+   * Handler: on PhotoFragment is pressed
+   * @param {Object} param
+   */
   _handlePtFragPress({ row, col })
   {
     let foundItem = this._findPhotoFragment({ row, col, visible: true });
@@ -262,25 +461,27 @@ export default class HomeComponent extends PureComponent
         let moveItem = posibleMoves[position];
         posibleItem = this._findPhotoFragment(Object.assign({ visible: false }, moveItem));
         if (posibleItem) {
-          // console.log('posibleItem: ', position, posibleItem);
-          // @TODO: switch PhotoFragments
-          this.setState(({ mapShuffle, moveCnt }) => {
-            let item = mapShuffle[foundItem.index];
-            mapShuffle[foundItem.index] = mapShuffle[posibleItem.index];
-            mapShuffle[posibleItem.index] = item;
-            mapShuffle = mapShuffle.concat([]);
-            // Check if game is finished?
-            setTimeout(() => {
-              if (this._isGameFinished()) {
-                alert(`Congratulations, your score(s): ${this.state.moveCnt}.`);
-              }
-            });
-            return { mapShuffle/*, moveCnt: moveCnt + 1*/ };
-          });
-          //
-          this._refHeaderComp.setMoveCnt(++this.state.moveCnt);
           break;
         }
+      }
+      // 
+      if (posibleItem) {
+        // console.log('posibleItem: ', position, posibleItem);
+        // Play sound
+        this._playSoundPtFragPress();
+        // @TODO: switch PhotoFragments
+        this.setState(({ mapShuffle, moveCnt }) => {
+          let item = mapShuffle[foundItem.index];
+          mapShuffle[foundItem.index] = mapShuffle[posibleItem.index];
+          mapShuffle[posibleItem.index] = item;
+          mapShuffle = mapShuffle.concat([]);
+          // Check if game is finished?
+          setTimeout(this._isGameFinished.bind(this));
+          //
+          this._refHeaderComp.setMoveCnt(++moveCnt);
+          //
+          return { mapShuffle, moveCnt };
+        });
       }
     }
   }
@@ -301,13 +502,16 @@ export default class HomeComponent extends PureComponent
     }
   }
 
+  /**
+   * Render <HeaderComponent />
+   */
   _renderHeader()
   {
-    let { moveCnt } = this.state;
+    let { gameCnt, moveCnt } = this.state;
 
     return (
       <HeaderComponent
-        // key={`hdr-mcnt${moveCnt}`}
+        key={`hdr${gameCnt}`}
         ref={ref => { this._refHeaderComp = ref; }}
         moveCnt={moveCnt}
       />
@@ -332,6 +536,9 @@ export default class HomeComponent extends PureComponent
     //
     return (
       <ImageBackground
+        ref={ref => {
+          this._refBody = ref;
+        }}
         source={require('../../../assets/img/empty_bg_xs.jpg')}
         style={[styles.body]}
         onLayout={(event) => {
@@ -382,6 +589,9 @@ export default class HomeComponent extends PureComponent
     return (
       <FooterComponent
         ref={ref => { this._refFooterComp = ref; }}
+        onSoundSystemPress={(pause) => {
+          this._playSoundSystemBg({ pause });
+        }}
       />
     );
   }
