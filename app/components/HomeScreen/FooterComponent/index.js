@@ -8,7 +8,6 @@ import {
   View,
   TouchableOpacity,
   PermissionsAndroid,
-  CameraRoll,
   TextInput
 } from 'react-native';
 import {
@@ -36,8 +35,6 @@ export default class FooterComponent extends PureComponent
 
     // Bind method(s)
     this._handleGetPhotos = this._handleGetPhotos.bind(this);
-    this._cameraRollRequestPermissions = this._cameraRollRequestPermissions.bind(this);
-    this._cameraRollGetPhotos = this._cameraRollGetPhotos.bind(this);
     this._handleSoundSystemPress = this._handleSoundSystemPress.bind(this);
 
     // Navigation event(s)
@@ -46,46 +43,12 @@ export default class FooterComponent extends PureComponent
   componentDidMount()
   {}
 
-  _handleGetPhotos()
+  _handleGetPhotos(event)
   {
-    this._cameraRollRequestPermissions()
-      .then(this._cameraRollGetPhotos)
-      .then((result) => {
-        console.log('_cameraRollGetPhotos: ', result);
-        this.setState({ photos: result.edges });
-      });
-  }
-
-  async _cameraRollRequestPermissions()
-  {
-    try {
-      const granted = await PermissionsAndroid.request(
-        PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-        {
-          title: 'Cool Photo App Camera Permission',
-          message: 'Cool Photo App needs access to your camera so you can take awesome pictures.',
-          buttonNeutral: 'Ask Me Later',
-          buttonNegative: 'Cancel',
-          buttonPositive: 'OK',
-        },
-      );
-      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-        return granted;
-      } else {
-        throw new Error('permission denied');
-      }
-    } catch (err) {
-      console.warn(err);
+    let { handleGetPhotos } = this.props;
+    if (handleGetPhotos) {
+      handleGetPhotos(event);
     }
-  }
-
-  async _cameraRollGetPhotos()
-  {
-    let result = await CameraRoll.getPhotos({
-      first: 25,
-      assetType: 'Photos'
-    });
-    return result;
   }
 
   /**

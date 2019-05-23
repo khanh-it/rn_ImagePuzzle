@@ -17,7 +17,6 @@ import {
   Text,
   VectorIcon
 } from 'react-native-my';
-import { RNCamera } from 'react-native-camera';
 // Css
 import styles from '../styles';
 
@@ -26,6 +25,10 @@ import HeaderComponent from '../HeaderComponent';
 import FooterComponent from '../FooterComponent';
 import PhotoFragmentComponent from '../PhotoFragmentComponent';
 import GetReadyComponent from './GetReadyComponent';
+import PhotoTakerComponent from '../PhotoTakerComponent';
+
+//
+import * as helpers from '../../../helpers';
 
 // Enable playback in silence mode
 Sound.setCategory('Playback');
@@ -67,7 +70,9 @@ export default class HomeComponent extends PureComponent
       /** @var {Number}  */
       moveCnt: 0, // move(s) count,
       /** @var {Boolean}  */
-      readyFlag: null
+      readyFlag: null,
+      /** @var {Boolean}  */
+      takePhotoFlag: false
     };
 
     // Bind method(s)
@@ -90,13 +95,12 @@ export default class HomeComponent extends PureComponent
     this._playSoundSystemBg({
       onBfPlay: (sound) => {
         sound.setNumberOfLoops(-1);
+        return false;
       }
     });
     this._playSoundPtFragPress({ onBfPlay: () => false });
     //.end
-
-    //
-    this._startGame();
+    // @TODO: this._startGame();
   }
 
   componentDidUpdate()
@@ -306,6 +310,8 @@ export default class HomeComponent extends PureComponent
         readyFlag: false
       }
     });
+    // @TODO: 
+    this._playSoundSystemBg({});
   }
 
   /**
@@ -317,8 +323,9 @@ export default class HomeComponent extends PureComponent
     let { map, mapShuffle } = this.state;
     // Shuffle map data of fragments from photo
     mapShuffle = map.concat([]); // copy array
-    // @TODO: helpers.shuffle(mapShuffle);
     let a = mapShuffle[0]; mapShuffle[0] = mapShuffle[1]; mapShuffle[1] = a;
+    // @TODO:
+    helpers.shuffle(mapShuffle);
     // @TODO: detect photo fragment is visible rule?
     mapShuffle[0].visible = false;
     //
@@ -592,14 +599,22 @@ export default class HomeComponent extends PureComponent
         onSoundSystemPress={(pause) => {
           this._playSoundSystemBg({ pause });
         }}
+        handleGetPhotos={() => {
+          this.setState({ takePhotoFlag: true });
+        }}
       />
     );
   }
 
-  render() {
+  render()
+  {
+    let {
+      takePhotoFlag
+    } = this.state;
     //
-    return (
+    return ([
       <ImageBackground
+        key='game-box'
         source={{}}
         style={[styles.root]}
       >
@@ -610,8 +625,21 @@ export default class HomeComponent extends PureComponent
           {/* footer */}{this._renderFooter()}{/* .end#footer */}
         </View>
         {/* .end#box */}
-      </ImageBackground>
-    );
+      </ImageBackground>,
+      (takePhotoFlag ? <PhotoTakerComponent
+        key='photo-taker-box'
+        ref={ref => {
+          this.refPhotoTaker = ref;
+        }}
+        onPhotoSelected={(photo) => {
+          this.setState({ takePhotoFlag: false });
+          this._startGame(photo.node.image);
+        }}
+        onClosed={() => {
+          this.setState({ takePhotoFlag: false });
+        }}
+      /> : null)
+    ]);
   }
 }
 // Make alias
